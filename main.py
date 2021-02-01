@@ -48,13 +48,12 @@ def downscale_by_factor(digits: np.ndarray, f: int) -> np.ndarray:
         for y in range(rows):
             for x in range(cols):
                 val = 0
-                kernel = range(int(np.floor(-f/2) + 1), int(np.floor(f / 2) + 1))
                 # sum each pixel's value
-                for j in kernel:
-                    for i in kernel:
+                for j in range(f):
+                    for i in range(f):
                         kernel_y = y * f + j
                         kernel_x = x * f + i
-                        val += digit[kernel_y][kernel_x] if 0 <= kernel_y < 16 and 0 <= kernel_x < 15 else 0
+                        val += digit[kernel_y][kernel_x] if kernel_y < 16 and kernel_x < 15 else 0
                 # divide by the number of pixels summed
                 new_digit[y * cols + x] = val / f**2
 
