@@ -8,7 +8,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score
 
 
-def reduce_val_range(x: np.ndarray) -> np.ndarray:
+def reduce_val_range(digits: np.ndarray) -> np.ndarray:
     """ Preprocess the digits dataset by reducing the value range of the pixels
 
     This method reduces the number of possible values that a pixel can have.
@@ -19,10 +19,48 @@ def reduce_val_range(x: np.ndarray) -> np.ndarray:
     [2 - 4] -> 1
     [5, 6] -> 2
 
-    :param x: original digits dataset
+    :param digits: original digits dataset
     :return: digits dataset with a reduced pixel value range
     """
-    return np.array([[round(pixel / 3) for pixel in digit] for digit in x])
+    return np.array([[round(pixel / 3) for pixel in digit] for digit in digits])
+
+
+def downscale_by_factor(digits: np.ndarray, f: int) -> np.ndarray:
+    """ Preprocess the digits dataset by downscaling it by a factor f
+
+    We know the original size of the pictures is 15 x 16, so we should divide
+    that number by the factor to get the number of rows and columns
+
+    :param digits: original digits dataset
+    :param f: integer factor to scale the the picture down by
+    :return: digits dataset with a reduced pixel value range
+    """
+    new_digits = []
+    for digit in digits:
+        cols = int(np.ceil(15 / f))
+        rows = int(np.ceil(16 / f))
+
+        digit = np.array(np.array_split(digit, 16))
+
+        new_digit = np.empty(rows * cols)
+
+        # for each new pixel, take the average pixel value of a f x f block around it
+        for y in range(rows):
+            for x in range(cols):
+                val = 0
+                kernel = range(int(np.floor(-f/2) + 1), int(np.floor(f / 2) + 1))
+                # sum each pixel's value
+                for j in kernel:
+                    for i in kernel:
+                        kernel_y = y * f + j
+                        kernel_x = x * f + i
+                        val += digit[kernel_y][kernel_x] if 0 <= kernel_y < 16 and 0 <= kernel_x < 15 else 0
+                # divide by the number of pixels summed
+                new_digit[y * cols + x] = val / f**2
+
+        new_digits.append(new_digit)
+
+    return np.array(new_digits)
 
 
 def read_digits_dataset(filename: str = "mfeat-pix.txt") -> np.ndarray:
@@ -33,7 +71,7 @@ def read_digits_dataset(filename: str = "mfeat-pix.txt") -> np.ndarray:
     x = []
     with open(filename, "r") as input_file:
         for line in input_file:
-            x.append([int(pixel) for pixel in line.split()])
+            x.append(np.array([int(pixel) for pixel in line.split()]))
     return np.array(x)
 
 
@@ -94,14 +132,19 @@ def main() -> None:
                                  min_samples_split=4, min_samples_leaf=1, min_weight_fraction_leaf=0,
                                  max_features="auto", max_leaf_nodes=None, min_impurity_decrease=0.0,
                                  bootstrap=False, oob_score=False, n_jobs=-1, random_state=1,
-                                 verbose=1, warm_start=False, class_weight=None, ccp_alpha=0.0,
+                                 verbose=0, warm_start=False, class_weight=None, ccp_alpha=0.0,
                                  max_samples=None)
 
-    x = read_digits_dataset()
-    score_raw = run_cross_val(clf, x)
-    score_reduced_range = run_cross_val(clf, reduce_val_range(x))
+    digits = read_digits_dataset()
+
+    score_raw = run_cross_val(clf, digits)
+    score_reduced_range = run_cross_val(clf, reduce_val_range(digits))
     print("No preprocessing avg x-val score: {}".format(score_raw))
     print("Reduced value range avg x-val score: {}".format(score_reduced_range))
+    for i in range(2, 6):
+        score_downscale = run_cross_val(clf, downscale_by_factor(digits, i))
+        print("Downscale factor {} avg x-val score: {}".format(i, score_downscale))
+
     # print("test score: ", run_test(clf, x))
 
 
