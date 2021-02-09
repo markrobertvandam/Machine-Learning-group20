@@ -1,6 +1,7 @@
 """
 Classifying the Digits dataset using a Random Forest Classifier
 """
+import sys
 from typing import Tuple
 
 import numpy as np
@@ -55,7 +56,7 @@ def downscale_by_factor(digits: np.ndarray, f: int) -> np.ndarray:
                         kernel_x = x * f + i
                         val += digit[kernel_y][kernel_x] if kernel_y < 16 and kernel_x < 15 else 0
                 # divide by the number of pixels summed
-                new_digit[y * cols + x] = val / f**2
+                new_digit[y * cols + x] = val / f ** 2
 
         new_digits.append(new_digit)
 
@@ -112,7 +113,23 @@ def run_cross_val(clf: RandomForestClassifier, x: np.ndarray, k: int = 10) -> fl
     return round(np.average(cross_val_score(clf, x_train, make_y(), cv=k)), 3)
 
 
-def run_test(clf: RandomForestClassifier, x: np.ndarray) -> float:
+def run_tuning(clf, digits) -> None:
+    """ Run the random forest classifier to obtain cross-validation scores
+
+    :param clf: random forest classifier instance
+    :param digits: digits dataset, possibly preprocessed
+    """
+    score_raw = run_cross_val(clf, digits)
+    print("No preprocessing score: {}".format(score_raw))
+    score_reduced_range = run_cross_val(clf, reduce_val_range(digits))
+    print("Reduced value range: {}".format(score_reduced_range))
+
+    for i in range(2, 6):
+        score_downscale = run_cross_val(clf, downscale_by_factor(digits, i))
+        print("Downscale factor {}: {}".format(i, score_downscale))
+
+
+def run_test(clf: RandomForestClassifier, x: np.ndarray) -> None:
     """ Run the random forest classifier to obtain the final test score
 
     :param clf: random forest classifier instance
@@ -122,29 +139,24 @@ def run_test(clf: RandomForestClassifier, x: np.ndarray) -> float:
     x_train, x_test = split_train_test(x)
     y = make_y()
     clf.fit(x_train, y)
-    return round(clf.score(x_test, y), 3)
+    print("Final score: ", round(clf.score(x_test, y), 3))
 
 
 def main() -> None:
     """ Run random forest machine learning"""
-    clf = RandomForestClassifier(n_estimators=200, criterion="gini", max_depth=None,
-                                 min_samples_split=4, min_samples_leaf=1, min_weight_fraction_leaf=0,
-                                 max_features="auto", max_leaf_nodes=None, min_impurity_decrease=0.0,
-                                 bootstrap=False, oob_score=False, n_jobs=-1, random_state=1,
-                                 verbose=0, warm_start=False, class_weight=None, ccp_alpha=0.0,
-                                 max_samples=None)
-
     digits = read_digits_dataset()
+    classifier = RandomForestClassifier(
+        n_estimators=200, criterion="gini", max_depth=None, min_samples_split=4, min_samples_leaf=1,
+        min_weight_fraction_leaf=0, max_features="auto", max_leaf_nodes=None, min_impurity_decrease=0.0,
+        bootstrap=False, oob_score=False, n_jobs=-1, random_state=1, verbose=0, warm_start=False,
+        class_weight=None, ccp_alpha=0.0, max_samples=None
+    )
 
-    score_raw = run_cross_val(clf, digits)
-    score_reduced_range = run_cross_val(clf, reduce_val_range(digits))
-    print("No preprocessing avg x-val score: {}".format(score_raw))
-    print("Reduced value range avg x-val score: {}".format(score_reduced_range))
-    for i in range(2, 6):
-        score_downscale = run_cross_val(clf, downscale_by_factor(digits, i))
-        print("Downscale factor {} avg x-val score: {}".format(i, score_downscale))
+    if len(sys.argv) > 1 and sys.argv[1] == '--test':
+        run_test(classifier, reduce_val_range(digits))
+        return
 
-    # print("test score: ", run_test(clf, x))
+    run_tuning(classifier, digits)
 
 
 if __name__ == "__main__":
